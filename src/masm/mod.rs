@@ -1,8 +1,8 @@
 use std::boxed::FnBox;
 use std::cell::Cell;
 use std::collections::HashSet;
-use std::ops::Deref;
 use std::mem::replace;
+use std::ops::Deref;
 use std::rc::Rc;
 
 use baseline::codegen::CondCode;
@@ -320,10 +320,27 @@ impl MacroAssembler {
         self.bind_label(done);
     }
 
-    pub fn out_of_line(&mut self, lbl_start: Label, generator: Box<FnBox(Label)>) {
+    pub fn out_of_line(
+        &mut self,
+        lbl_start: Label,
+        generator: Box<FnBox(&mut MacroAssembler, Label)>,
+    ) {
         let lbl_return = self.create_label();
         self.bind_label(lbl_return);
 
+        self.ools.push(OutOfLine {
+            lbl_start: lbl_start,
+            lbl_return: lbl_return,
+            generator: generator,
+        });
+    }
+
+    pub fn out_of_line_return(
+        &mut self,
+        lbl_start: Label,
+        lbl_return: Label,
+        generator: Box<FnBox(&mut MacroAssembler, Label)>,
+    ) {
         self.ools.push(OutOfLine {
             lbl_start: lbl_start,
             lbl_return: lbl_return,
@@ -420,7 +437,7 @@ impl Deref for ScratchReg {
 struct OutOfLine<'a> {
     lbl_start: Label,
     lbl_return: Label,
-    generator: Box<FnBox(Label)>,
+    generator: Box<FnBox(&mut MacroAssembler, Label)>,
 }
 
 #[cfg(test)]

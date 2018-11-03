@@ -287,11 +287,6 @@ where
                     REG_TMP2,
                 );
 
-                let lbl_start = self.masm.create_label();
-                self.masm.out_of_line(lbl_start, Box::new(|_, _| {
-                    println!("do nothing");
-                }));
-
                 if e.is {
                     // dest = if zero then true else false
                     self.masm.set(dest, CondCode::Equal);
