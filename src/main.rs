@@ -1,9 +1,10 @@
+#![feature(allocator_api)]
 #![feature(asm)]
 #![feature(alloc)]
 #![feature(box_syntax)]
+#![feature(fnbox)]
 #![allow(dead_code)]
 #![allow(non_camel_case_types)]
-#![feature(allocator_api)]
 
 extern crate alloc;
 extern crate byteorder;

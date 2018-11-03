@@ -1,6 +1,8 @@
+use std::boxed::FnBox;
 use std::cell::Cell;
 use std::collections::HashSet;
 use std::ops::Deref;
+use std::mem::replace;
 use std::rc::Rc;
 
 use baseline::codegen::CondCode;
@@ -44,6 +46,7 @@ pub struct MacroAssembler {
     linenos: LineNumberTable,
     exception_handlers: Vec<ExHandler>,
     scratch_registers: ScratchRegisters,
+    ools: Vec<OutOfLine>,
 }
 
 impl MacroAssembler {
@@ -61,6 +64,7 @@ impl MacroAssembler {
             linenos: LineNumberTable::new(),
             exception_handlers: Vec::new(),
             scratch_registers: ScratchRegisters::new(),
+            ools: Vec::new(),
         }
     }
 
@@ -105,6 +109,7 @@ impl MacroAssembler {
     }
 
     fn finish(&mut self) {
+        let emit_nop = self.bailouts.len() > 0 || self.ools.len() > 0;
         let bailouts = self.bailouts.drain(0..).collect::<Vec<_>>();
 
         for bailout in &bailouts {
@@ -114,9 +119,16 @@ impl MacroAssembler {
             self.trap(trap, pos);
         }
 
-        // add nop after bailout traps, so that we can't find return address
+        let ools = replace(&mut self.ools, Vec::new());
+
+        for ool in ools {
+            self.bind_label(ool.lbl_start);
+            ool.generator.call_box((ool.lbl_return,));
+        }
+
+        // add nop after bailout traps, so that we can find return address
         // in code map, even though return address is at function end.
-        if bailouts.len() > 0 {
+        if emit_nop {
             self.nop();
         }
 
@@ -307,6 +319,17 @@ impl MacroAssembler {
         self.jump(start);
         self.bind_label(done);
     }
+
+    pub fn out_of_line(&mut self, lbl_start: Label, generator: Box<FnBox(Label)>) {
+        let lbl_return = self.create_label();
+        self.bind_label(lbl_return);
+
+        self.ools.push(OutOfLine {
+            lbl_start: lbl_start,
+            lbl_return: lbl_return,
+            generator: generator,
+        });
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -392,6 +415,12 @@ impl Deref for ScratchReg {
     fn deref(&self) -> &Reg {
         &self.reg
     }
+}
+
+struct OutOfLine<'a> {
+    lbl_start: Label,
+    lbl_return: Label,
+    generator: Box<FnBox(Label)>,
 }
 
 #[cfg(test)]
