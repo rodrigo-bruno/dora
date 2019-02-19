@@ -51,49 +51,49 @@ pub struct LoopLabels {
 
 #[derive(PartialEq, Debug)]
 pub enum Bytecode {
-    AddI8(Register), // TODO - used where?
-    AddI32(Register),
-    AddI64(Register),
-    AddF32(Register),
-    AddF64(Register),
+    AddShort(Register), // TODO - used where?
+    AddInt(Register),
+    AddLong(Register),
+    AddFloat(Register),
+    AddDouble(Register),
     BitwiseAnd(Register),
     BitwiseOr(Register),
     BitwiseXor(Register),
-    DivI32(Register),
-    DivI64(Register),
-    DivF32(Register),
-    DivF64(Register),
-    LdarI8(Register),
-    LdarI32(Register),
-    LdarI64(Register),
-    LdarF32(Register),
-    LdarF64(Register),
-    LdaI8(u8),
-    LdaI32(u32),
-    LdaI64(u64),
-    LdaF32(f32),
-    LdaF64(f64),
+    DivInt(Register),
+    DivLong(Register),
+    DivFloat(Register),
+    DivDouble(Register),
+    LdarShort(Register),
+    LdarInt(Register),
+    LdarLong(Register),
+    LdarFloat(Register),
+    LdarDouble(Register),
+    LdaShort(u8),
+    LdaInt(u32),
+    LdaLong(u64),
+    LdaFloat(f32),
+    LdaDouble(f64),
     LdaZero,
     LogicalNot,
-    StarI8(Register),
-    StarI32(Register),
-    StarI64(Register),
-    StarF32(Register),
-    StarF64(Register),
+    StarShort(Register),
+    StarInt(Register),
+    StarLong(Register),
+    StarFloat(Register),
+    StarDouble(Register),
     JumpIfFalse(Label),
     Jump(Label),
     Mod(Register),
-    MulI32(Register),
-    MulI64(Register),
-    MulF32(Register),
-    MulF64(Register),
+    MulInt(Register),
+    MulLong(Register),
+    MulFloat(Register),
+    MulDouble(Register),
     Neg,
     ShiftLeft(Register),
     ShiftRight(Register),
-    SubI32(Register),
-    SubI64(Register),
-    SubF32(Register),
-    SubF64(Register),
+    SubInt(Register),
+    SubLong(Register),
+    SubFloat(Register),
+    SubDouble(Register),
     Return,
     ReturnVoid,
     TestEqual(Register),
@@ -151,15 +151,15 @@ impl<'ast> BytecodeGen<'ast> {
         let mut btidx = 0;
         for btcode in self.code.iter() {
             match btcode {
-                Bytecode::AddI8(Register(register)) =>
+                Bytecode::AddShort(Register(register)) =>
                     println!("{}: AddI8 {}", btidx, register),
-                Bytecode::AddI32(Register(register)) =>
+                Bytecode::AddInt(Register(register)) =>
                     println!("{}: AddI32 {}", btidx, register),
-                Bytecode::AddI64(Register(register)) =>
+                Bytecode::AddLong(Register(register)) =>
                     println!("{}: AddI64 {}", btidx, register),
-                Bytecode::AddF32(Register(register)) =>
+                Bytecode::AddFloat(Register(register)) =>
                     println!("{}: AddF32 {}", btidx, register),
-                Bytecode::AddF64(Register(register)) =>
+                Bytecode::AddDouble(Register(register)) =>
                     println!("{}: AddF64 {}", btidx, register),
                 Bytecode::BitwiseAnd(Register(register)) =>
                     println!("{}: BitwiseAnd {}", btidx, register),
@@ -167,47 +167,47 @@ impl<'ast> BytecodeGen<'ast> {
                     println!("{}: BitwiseOr {}", btidx, register),
                 Bytecode::BitwiseXor(Register(register)) =>
                     println!("{}: BitwiseXor {}", btidx, register),
-                Bytecode::DivI32(Register(register)) =>
+                Bytecode::DivInt(Register(register)) =>
                     println!("{}: DivI32 {}", btidx, register),
-                Bytecode::DivI64(Register(register)) =>
+                Bytecode::DivLong(Register(register)) =>
                     println!("{}: DivI64 {}", btidx, register),
-                Bytecode::DivF32(Register(register)) =>
+                Bytecode::DivFloat(Register(register)) =>
                     println!("{}: DivF32 {}", btidx, register),
-                Bytecode::DivF64(Register(register)) =>
+                Bytecode::DivDouble(Register(register)) =>
                     println!("{}: DivF64 {}", btidx, register),
-                Bytecode::LdarI8(Register(register)) =>
+                Bytecode::LdarShort(Register(register)) =>
                     println!("{}: LdarI8 {}", btidx, register),
-                Bytecode::LdarI32(Register(register)) =>
+                Bytecode::LdarInt(Register(register)) =>
                     println!("{}: LdarI32 {}", btidx, register),
-                Bytecode::LdarI64(Register(register)) =>
+                Bytecode::LdarLong(Register(register)) =>
                     println!("{}: LdarI64 {}", btidx, register),
-                Bytecode::LdarF32(Register(register)) =>
+                Bytecode::LdarFloat(Register(register)) =>
                     println!("{}: LdarF32 {}", btidx, register),
-                Bytecode::LdarF64(Register(register)) =>
+                Bytecode::LdarDouble(Register(register)) =>
                     println!("{}: LdarF64 {}", btidx, register),
-                Bytecode::LdaI8(value) =>
+                Bytecode::LdaShort(value) =>
                     println!("{}: LdaI8 {}", btidx, value),
-                Bytecode::LdaI32(value) =>
+                Bytecode::LdaInt(value) =>
                     println!("{}: LdaI32 {}", btidx, value),
-                Bytecode::LdaI64(value) =>
+                Bytecode::LdaLong(value) =>
                     println!("{}: LdaI64 {}", btidx, value),
-                Bytecode::LdaF32(value) =>
+                Bytecode::LdaFloat(value) =>
                     println!("{}: LdaF32 {}", btidx, value),
-                Bytecode::LdaF64(value) =>
+                Bytecode::LdaDouble(value) =>
                     println!("{}: LdaF64 {}", btidx, value),
                 Bytecode::LdaZero =>
                     println!("{}: LdaZero", btidx),
                 Bytecode::LogicalNot =>
                     println!("{}: LogicalNot", btidx),
-                Bytecode::StarI8(Register(register)) =>
+                Bytecode::StarShort(Register(register)) =>
                     println!("{}: StarI8 {}", btidx, register),
-                Bytecode::StarI32(Register(register)) =>
+                Bytecode::StarInt(Register(register)) =>
                     println!("{}: StarI32 {}", btidx, register),
-                Bytecode::StarI64(Register(register)) =>
+                Bytecode::StarLong(Register(register)) =>
                     println!("{}: StarI64 {}", btidx, register),
-                Bytecode::StarF32(Register(register)) =>
+                Bytecode::StarFloat(Register(register)) =>
                     println!("{}: StarF32 {}", btidx, register),
-                Bytecode::StarF64(Register(register)) =>
+                Bytecode::StarDouble(Register(register)) =>
                     println!("{}: StarF64 {}", btidx, register),
                 Bytecode::JumpIfFalse(label) =>
                     println!("{}: JumpIfFalse {}", btidx, self.labels.get(label).unwrap()),
@@ -215,13 +215,13 @@ impl<'ast> BytecodeGen<'ast> {
                     println!("{}: Jump {}", btidx, self.labels.get(label).unwrap()),
                 Bytecode::Mod(Register(register)) =>
                     println!("{}: Mod {}", btidx, register),
-                Bytecode::MulI32(Register(register)) =>
+                Bytecode::MulInt(Register(register)) =>
                     println!("{}: MulI32 {}", btidx, register),
-                Bytecode::MulI64(Register(register)) =>
+                Bytecode::MulLong(Register(register)) =>
                     println!("{}: MulI64 {}", btidx, register),
-                Bytecode::MulF32(Register(register)) =>
+                Bytecode::MulFloat(Register(register)) =>
                     println!("{}: MulI32 {}", btidx, register),
-                Bytecode::MulF64(Register(register)) =>
+                Bytecode::MulDouble(Register(register)) =>
                     println!("{}: MulI64 {}", btidx, register),
                 Bytecode::Neg =>
                     println!("{}: Neg", btidx),
@@ -229,13 +229,13 @@ impl<'ast> BytecodeGen<'ast> {
                     println!("{}: ShiftLeft {}", btidx, register),
                 Bytecode::ShiftRight(Register(register)) =>
                     println!("{}: ShiftRight {}", btidx, register),
-                Bytecode::SubI32(Register(register)) =>
+                Bytecode::SubInt(Register(register)) =>
                     println!("{}: SubI32 {}", btidx, register),
-                Bytecode::SubI64(Register(register)) =>
+                Bytecode::SubLong(Register(register)) =>
                     println!("{}: SubI64 {}", btidx, register),
-                Bytecode::SubF32(Register(register)) =>
+                Bytecode::SubFloat(Register(register)) =>
                     println!("{}: SubI32 {}", btidx, register),
-                Bytecode::SubF64(Register(register)) =>
+                Bytecode::SubDouble(Register(register)) =>
                     println!("{}: SubI64 {}", btidx, register),
                 Bytecode::Return =>
                     println!("{}: Return", btidx),
@@ -292,10 +292,10 @@ impl<'ast> BytecodeGen<'ast> {
     fn gen_star(&mut self, src: &mut FctSrc, nid: NodeId, reg: Register) {
         let expr_ty = src.ty(nid);
         match expr_ty {
-            BuiltinType::Int => { self.code.push(Bytecode::StarI32(reg)) },
-            BuiltinType::Long => { self.code.push(Bytecode::StarI64(reg)) },
-            BuiltinType::Float => { self.code.push(Bytecode::StarF32(reg)) },
-            BuiltinType::Double => { self.code.push(Bytecode::StarF64(reg)) },
+            BuiltinType::Int => { self.code.push(Bytecode::StarInt(reg)) },
+            BuiltinType::Long => { self.code.push(Bytecode::StarLong(reg)) },
+            BuiltinType::Float => { self.code.push(Bytecode::StarFloat(reg)) },
+            BuiltinType::Double => { self.code.push(Bytecode::StarDouble(reg)) },
             _ => unimplemented!(),
         }
     }
@@ -315,7 +315,7 @@ impl<'ast> BytecodeGen<'ast> {
         } else {
             self.code.push(Bytecode::LdaZero);
             // TODO - check this, I dont know the type.
-            self.code.push(Bytecode::StarI32(Register(reg)));
+            self.code.push(Bytecode::StarInt(Register(reg)));
         };
     }
 
@@ -416,7 +416,7 @@ impl<'ast> BytecodeGen<'ast> {
     }
 
     fn visit_expr_lit_char(&mut self, src: &mut FctSrc, lit: &ExprLitCharType) {
-        self.code.push(Bytecode::LdaI8(lit.value as u8));
+        self.code.push(Bytecode::LdaShort(lit.value as u8));
     }
 
     fn visit_expr_lit_int(&mut self, src: &mut FctSrc, lit: &ExprLitIntType) {
@@ -424,9 +424,9 @@ impl<'ast> BytecodeGen<'ast> {
             self.code.push(Bytecode::LdaZero);
         } else {
             let bytecode = match lit.suffix {
-                IntSuffix::Byte => Bytecode::LdaI8(lit.value as u8),
-                IntSuffix::Int => Bytecode::LdaI32(lit.value as u32),
-                IntSuffix::Long => Bytecode::LdaI64(lit.value as u64),
+                IntSuffix::Byte => Bytecode::LdaShort(lit.value as u8),
+                IntSuffix::Int => Bytecode::LdaInt(lit.value as u32),
+                IntSuffix::Long => Bytecode::LdaLong(lit.value as u64),
             };
             self.code.push(bytecode);
         }
@@ -434,8 +434,8 @@ impl<'ast> BytecodeGen<'ast> {
 
     fn visit_expr_lit_float(&mut self, src: &mut FctSrc, lit: &ExprLitFloatType) {
         let bytecode = match lit.suffix {
-            FloatSuffix::Float => Bytecode::LdaF32(lit.value as f32),
-            FloatSuffix::Double => Bytecode::LdaF64(lit.value as f64),
+            FloatSuffix::Float => Bytecode::LdaFloat(lit.value as f32),
+            FloatSuffix::Double => Bytecode::LdaDouble(lit.value as f64),
         };
         self.code.push(bytecode);
     }
@@ -452,10 +452,10 @@ impl<'ast> BytecodeGen<'ast> {
     fn gen_add(&mut self, src: &mut FctSrc, expr: &ExprBinType, reg: Register) {
         let expr_ty = src.ty(expr.id);
         match expr_ty {
-            BuiltinType::Int => { self.code.push(Bytecode::AddI32(reg)) },
-            BuiltinType::Long => { self.code.push(Bytecode::AddI64(reg)) },
-            BuiltinType::Float => { self.code.push(Bytecode::AddF32(reg)) },
-            BuiltinType::Double => { self.code.push(Bytecode::AddF64(reg)) },
+            BuiltinType::Int => { self.code.push(Bytecode::AddInt(reg)) },
+            BuiltinType::Long => { self.code.push(Bytecode::AddLong(reg)) },
+            BuiltinType::Float => { self.code.push(Bytecode::AddFloat(reg)) },
+            BuiltinType::Double => { self.code.push(Bytecode::AddDouble(reg)) },
             _ => unimplemented!(),
         }
     }
@@ -463,10 +463,10 @@ impl<'ast> BytecodeGen<'ast> {
     fn gen_sub(&mut self, src: &mut FctSrc, expr: &ExprBinType, reg: Register) {
         let expr_ty = src.ty(expr.id);
         match expr_ty {
-            BuiltinType::Int => { self.code.push(Bytecode::SubI32(reg)) },
-            BuiltinType::Long => { self.code.push(Bytecode::SubI64(reg)) },
-            BuiltinType::Float => { self.code.push(Bytecode::SubF32(reg)) },
-            BuiltinType::Double => { self.code.push(Bytecode::SubF64(reg)) },
+            BuiltinType::Int => { self.code.push(Bytecode::SubInt(reg)) },
+            BuiltinType::Long => { self.code.push(Bytecode::SubLong(reg)) },
+            BuiltinType::Float => { self.code.push(Bytecode::SubFloat(reg)) },
+            BuiltinType::Double => { self.code.push(Bytecode::SubDouble(reg)) },
             _ => unimplemented!(),
         }
     }
@@ -474,10 +474,10 @@ impl<'ast> BytecodeGen<'ast> {
     fn gen_mul(&mut self, src: &mut FctSrc, expr: &ExprBinType, reg: Register) {
         let expr_ty = src.ty(expr.id);
         match expr_ty {
-            BuiltinType::Int => { self.code.push(Bytecode::MulI32(reg)) },
-            BuiltinType::Long => { self.code.push(Bytecode::MulI64(reg)) },
-            BuiltinType::Float => { self.code.push(Bytecode::MulF32(reg)) },
-            BuiltinType::Double => { self.code.push(Bytecode::MulF64(reg)) },
+            BuiltinType::Int => { self.code.push(Bytecode::MulInt(reg)) },
+            BuiltinType::Long => { self.code.push(Bytecode::MulLong(reg)) },
+            BuiltinType::Float => { self.code.push(Bytecode::MulFloat(reg)) },
+            BuiltinType::Double => { self.code.push(Bytecode::MulDouble(reg)) },
             _ => unimplemented!(),
         }
     }
@@ -485,10 +485,10 @@ impl<'ast> BytecodeGen<'ast> {
     fn gen_div(&mut self, src: &mut FctSrc, expr: &ExprBinType, reg: Register) {
         let expr_ty = src.ty(expr.id);
         match expr_ty {
-            BuiltinType::Int => { self.code.push(Bytecode::DivI32(reg)) },
-            BuiltinType::Long => { self.code.push(Bytecode::DivI64(reg)) },
-            BuiltinType::Float => { self.code.push(Bytecode::DivF32(reg)) },
-            BuiltinType::Double => { self.code.push(Bytecode::DivF64(reg)) },
+            BuiltinType::Int => { self.code.push(Bytecode::DivInt(reg)) },
+            BuiltinType::Long => { self.code.push(Bytecode::DivLong(reg)) },
+            BuiltinType::Float => { self.code.push(Bytecode::DivFloat(reg)) },
+            BuiltinType::Double => { self.code.push(Bytecode::DivDouble(reg)) },
             _ => unimplemented!(),
         }
     }
@@ -552,10 +552,10 @@ impl<'ast> BytecodeGen<'ast> {
         let Register(reg) = *self.get_reg(ident.name).unwrap();
         let expr_ty = src.ty(ident.id);
         match expr_ty {
-            BuiltinType::Int => { self.code.push(Bytecode::LdarI32(Register(reg))) },
-            BuiltinType::Long => { self.code.push(Bytecode::LdarI64(Register(reg))) },
-            BuiltinType::Float => { self.code.push(Bytecode::LdarF32(Register(reg))) },
-            BuiltinType::Double => { self.code.push(Bytecode::LdarF64(Register(reg))) },
+            BuiltinType::Int => { self.code.push(Bytecode::LdarInt(Register(reg))) },
+            BuiltinType::Long => { self.code.push(Bytecode::LdarLong(Register(reg))) },
+            BuiltinType::Float => { self.code.push(Bytecode::LdarFloat(Register(reg))) },
+            BuiltinType::Double => { self.code.push(Bytecode::LdarDouble(Register(reg))) },
             _ => unimplemented!(),
         }
     }
@@ -624,10 +624,10 @@ mod tests {
             "f",
             "optimize fun f() {1 + 2;}",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
-                AddI32(Register(0)),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
+                AddInt(Register(0)),
                 ReturnVoid]);
     }
 
@@ -637,10 +637,10 @@ mod tests {
             "f",
             "optimize fun f() {1 - 2;}",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
-                SubI32(Register(0)),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
+                SubInt(Register(0)),
                 ReturnVoid]);
     }
 
@@ -650,10 +650,10 @@ mod tests {
             "f",
             "optimize fun f() {1 / 2;}",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
-                DivI32(Register(0)),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
+                DivInt(Register(0)),
                 ReturnVoid]);
     }
 
@@ -663,10 +663,10 @@ mod tests {
             "f",
             "optimize fun f() {1 * 2;}",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
-                MulI32(Register(0)),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
+                MulInt(Register(0)),
                 ReturnVoid]);
     }
 
@@ -675,7 +675,7 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { let x; }",
-            vec![LdaZero, StarI32(Register(0)), ReturnVoid]);
+            vec![LdaZero, StarInt(Register(0)), ReturnVoid]);
     }
 
     #[test]
@@ -683,7 +683,7 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { let x = 1; }",
-            vec![LdaI32(1), StarI32(Register(0)), ReturnVoid]);
+            vec![LdaInt(1), StarInt(Register(0)), ReturnVoid]);
     }
 
     #[test]
@@ -692,7 +692,7 @@ mod tests {
             "f",
             "optimize fun f() { while 1 { 0; } }",
             vec![
-                LdaI32(1),
+                LdaInt(1),
                 JumpIfFalse(Label(1)),
                 LdaZero,
                 Jump(Label(0)),
@@ -710,7 +710,7 @@ mod tests {
             vec![
                 LdaZero,
                 JumpIfFalse(Label(0)),
-                LdaI32(1),
+                LdaInt(1),
                 Jump(Label(1)),
                 ReturnVoid]);
         // TODO - need to assert labels
@@ -726,9 +726,9 @@ mod tests {
             vec![
                 LdaZero,
                 JumpIfFalse(Label(0)),
-                LdaI32(1),
+                LdaInt(1),
                 Jump(Label(1)),
-                LdaI32(2),
+                LdaInt(2),
                 ReturnVoid]);
         // TODO - need to assert labels
 //        let labels = hashmap![Label(0) => 4, Label(1) => 5];
@@ -741,7 +741,7 @@ mod tests {
             "f",
             "optimize fun f() { while 1 { break; } }",
             vec![
-                LdaI32(1),
+                LdaInt(1),
                 JumpIfFalse(Label(1)),
                 Jump(Label(1)),
                 Jump(Label(0)),
@@ -757,7 +757,7 @@ mod tests {
             "f",
             "optimize fun f() { while 1 { continue; } }",
             vec![
-                LdaI32(1),
+                LdaInt(1),
                 JumpIfFalse(Label(1)),
                 Jump(Label(0)),
                 Jump(Label(0)),
@@ -772,7 +772,7 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { 1; }",
-            vec![LdaI32(1), ReturnVoid]);
+            vec![LdaInt(1), ReturnVoid]);
     }
 
     #[test]
@@ -788,7 +788,7 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { +1; }",
-            vec![ LdaI32(1), ReturnVoid]);
+            vec![ LdaInt(1), ReturnVoid]);
     }
 
     #[test]
@@ -796,7 +796,7 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { -1; }",
-            vec![ LdaI32(1), Neg, ReturnVoid]);
+            vec![ LdaInt(1), Neg, ReturnVoid]);
     }
 
     #[test]
@@ -804,7 +804,7 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { !1; }",
-            vec![ LdaI32(1), LogicalNot, ReturnVoid]);
+            vec![ LdaInt(1), LogicalNot, ReturnVoid]);
     }
 
     #[test]
@@ -813,9 +813,9 @@ mod tests {
             "f",
             "optimize fun f() { 1 % 2; }",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
                 Mod(Register(0)),
                 ReturnVoid]);
     }
@@ -826,9 +826,9 @@ mod tests {
             "f",
             "optimize fun f() { 1 | 2; }",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
                 BitwiseOr(Register(0)),
                 ReturnVoid]);
     }
@@ -839,9 +839,9 @@ mod tests {
             "f",
             "optimize fun f() { 1 & 2; }",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
                 BitwiseAnd(Register(0)),
                 ReturnVoid]);
     }
@@ -852,9 +852,9 @@ mod tests {
             "f",
             "optimize fun f() { 1 ^ 2; }",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
                 BitwiseXor(Register(0)),
                 ReturnVoid]);
     }
@@ -865,9 +865,9 @@ mod tests {
             "f",
             "optimize fun f() { 1 << 2; }",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
                 ShiftLeft(Register(0)),
                 ReturnVoid]);
     }
@@ -878,9 +878,9 @@ mod tests {
             "f",
             "optimize fun f() { 1 >> 2; }",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
                 ShiftRight(Register(0)),
                 ReturnVoid]);
     }
@@ -891,9 +891,9 @@ mod tests {
             "f",
             "optimize fun f() { 1 == 2; }",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
                 TestEqual(Register(0)),
                 ReturnVoid]);
     }
@@ -904,9 +904,9 @@ mod tests {
             "f",
             "optimize fun f() { 1 != 2; }",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
                 TestNotEqual(Register(0)),
                 ReturnVoid]);
     }
@@ -917,9 +917,9 @@ mod tests {
             "f",
             "optimize fun f() { 1 < 2; }",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
                 TestLessThan(Register(0)),
                 ReturnVoid]);
     }
@@ -930,9 +930,9 @@ mod tests {
             "f",
             "optimize fun f() { 1 <= 2; }",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
                 TestLessThanOrEqual(Register(0)),
                 ReturnVoid]);
     }
@@ -943,9 +943,9 @@ mod tests {
             "f",
             "optimize fun f() { 1 > 2; }",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
                 TestGreatherThan(Register(0)),
                 ReturnVoid]);
     }
@@ -956,9 +956,9 @@ mod tests {
             "f",
             "optimize fun f() { 1 >= 2; }",
             vec![
-                LdaI32(2),
-                StarI32(Register(0)),
-                LdaI32(1),
+                LdaInt(2),
+                StarInt(Register(0)),
+                LdaInt(1),
                 TestGreatherThanOrEqual(Register(0)),
                 ReturnVoid]);
     }
@@ -969,9 +969,9 @@ mod tests {
             "f",
             "optimize fun f() { let x = 1; x; }",
             vec![
-                LdaI32(1),
-                StarI32(Register(0)),
-                LdarI32(Register(0)),
+                LdaInt(1),
+                StarInt(Register(0)),
+                LdarInt(Register(0)),
                 ReturnVoid]);
     }
 
@@ -981,10 +981,10 @@ mod tests {
             "f",
             "optimize fun f() { var x = 1; x = 2; }",
             vec![
-                LdaI32(1),
-                StarI32(Register(0)),
-                LdaI32(2),
-                StarI32(Register(0)),
+                LdaInt(1),
+                StarInt(Register(0)),
+                LdaInt(2),
+                StarInt(Register(0)),
                 ReturnVoid]);
     }
 
@@ -993,7 +993,7 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { return 1; }",
-            vec![ LdaI32(1), Return ]);
+            vec![ LdaInt(1), Return ]);
     }
 
     #[test]
