@@ -62,11 +62,6 @@ pub fn start(content: Option<&str>) -> i32 {
         ast::dump::dump(&ast, &interner);
     }
 
-    {
-        let mut bytecodegen = BytecodeGen::new();
-        bytecodegen.gen(&ast);
-    }
-
     let mut vm = VM::new(args, &ast, interner);
 
     semck::check(&mut vm);
@@ -204,7 +199,7 @@ fn run_main<'ast>(vm: &VM<'ast>, main: FctId) -> i32 {
     }
 }
 
-fn parse_dir(
+pub fn parse_dir(
     dirname: &str,
     id_generator: &NodeIdGenerator,
     ast: &mut Ast,
@@ -229,7 +224,7 @@ fn parse_dir(
     }
 }
 
-fn parse_file(
+pub fn parse_file(
     filename: &str,
     id_generator: &NodeIdGenerator,
     ast: &mut Ast,

@@ -1,10 +1,14 @@
 use std::collections::HashMap;
 
-use dora_parser::ast::visit::Visitor;
+use ty::BuiltinType;
+use ctxt::{VM, Fct, FctId, FctSrc};
+
+use dora_parser::ast::*;
 use dora_parser::ast::Expr::*;
 use dora_parser::ast::Stmt::*;
 use dora_parser::ast::*;
 use dora_parser::interner::Name;
+use dora_parser::lexer::token::{FloatSuffix, IntSuffix};
 
 #[derive(PartialEq, Debug)]
 pub struct Register(usize);
@@ -47,24 +51,49 @@ pub struct LoopLabels {
 
 #[derive(PartialEq, Debug)]
 pub enum Bytecode {
-    Add(Register),
+    AddI8(Register), // TODO - used where?
+    AddI32(Register),
+    AddI64(Register),
+    AddF32(Register),
+    AddF64(Register),
     BitwiseAnd(Register),
     BitwiseOr(Register),
     BitwiseXor(Register),
-    Div(Register),
-    Ldar(Register),
-    LdaInt(u64),
+    DivI32(Register),
+    DivI64(Register),
+    DivF32(Register),
+    DivF64(Register),
+    LdarI8(Register),
+    LdarI32(Register),
+    LdarI64(Register),
+    LdarF32(Register),
+    LdarF64(Register),
+    LdaI8(u8),
+    LdaI32(u32),
+    LdaI64(u64),
+    LdaF32(f32),
+    LdaF64(f64),
     LdaZero,
     LogicalNot,
-    Star(Register),
+    StarI8(Register),
+    StarI32(Register),
+    StarI64(Register),
+    StarF32(Register),
+    StarF64(Register),
     JumpIfFalse(Label),
     Jump(Label),
     Mod(Register),
-    Mul(Register),
+    MulI32(Register),
+    MulI64(Register),
+    MulF32(Register),
+    MulF64(Register),
     Neg,
     ShiftLeft(Register),
     ShiftRight(Register),
-    Sub(Register),
+    SubI32(Register),
+    SubI64(Register),
+    SubF32(Register),
+    SubF64(Register),
     Return,
     ReturnVoid,
     TestEqual(Register),
@@ -75,7 +104,8 @@ pub enum Bytecode {
     TestNotEqual(Register),
 }
 
-pub struct BytecodeGen {
+pub struct BytecodeGen<'ast> {
+    vm: &'ast VM<'ast>,
     code: Vec<Bytecode>,
     ctxs: Vec<Context>,
     loops: Vec<LoopLabels>,
@@ -83,101 +113,146 @@ pub struct BytecodeGen {
     regs: usize,
 }
 
-impl<'ast> visit::Visitor<'ast> for BytecodeGen {
-    fn visit_fct(&mut self, f: &'ast Function) {
-        if !f.has_optimize {
+impl<'ast> BytecodeGen<'ast> {
+
+    pub fn generate(vm: &'ast VM<'ast>, id: FctId) -> BytecodeGen {
+        let fct = vm.fcts[id].borrow();
+        let src = fct.src();
+        let mut src = src.borrow_mut();
+        let mut generator = BytecodeGen {
+            vm : vm,
+            code: Vec::new(),
+            ctxs: Vec::new(),
+            loops: Vec::new(),
+            labels: HashMap::new(),
+            regs: 0,
+        };
+        generator.generate_fct(vm, &fct, &mut src);
+        return generator;
+    }
+
+    pub fn generate_fct(&mut self, vm: &'ast VM<'ast>, fct: &Fct<'ast>, src: &mut FctSrc) {
+        if  !fct.ast.has_optimize {
             return;
         }
 
-        for p in &f.params {
-            self.visit_param(p);
-        }
+        // TODO - handle types
 
-        if let Some(ref ty) = f.return_type {
-            self.visit_type(ty);
-        }
-
-        if let Some(ref block) = f.block {
-            self.visit_stmt(block);
+        if let Some(ref block) = fct.ast.block {
+            self.visit_stmt(src, block);
         }
 
         if self.code.len() == 0 || self.code.last().unwrap() != &Bytecode::Return {
             self.code.push(Bytecode::ReturnVoid);
         }
     }
-}
-
-impl BytecodeGen {
-    pub fn new() -> BytecodeGen {
-        BytecodeGen {
-            code: Vec::new(),
-            ctxs: Vec::new(),
-            loops: Vec::new(),
-            labels: HashMap::new(),
-            regs: 0,
-        }
-    }
-
-    pub fn gen(&mut self, ast: &Ast) {
-        self.visit_ast(ast);
-    }
 
     pub fn dump(&self) {
         let mut btidx = 0;
         for btcode in self.code.iter() {
             match btcode {
-                Bytecode::Add(Register(register)) => println!("{}: Add {}", btidx, register),
-                Bytecode::BitwiseAnd(Register(register)) => {
-                    println!("{}: BitwiseAnd {}", btidx, register)
-                }
-                Bytecode::BitwiseOr(Register(register)) => {
-                    println!("{}: BitwiseOr {}", btidx, register)
-                }
-                Bytecode::BitwiseXor(Register(register)) => {
-                    println!("{}: BitwiseXor {}", btidx, register)
-                }
-                Bytecode::Div(Register(register)) => println!("{}: Div {}", btidx, register),
-                Bytecode::Ldar(Register(register)) => println!("{}: Ldar {}", btidx, register),
-                Bytecode::LdaInt(value) => println!("{}: LdaInt {}", btidx, value),
-                Bytecode::LdaZero => println!("{}: LdaZero", btidx),
-                Bytecode::LogicalNot => println!("{}: LogicalNot", btidx),
-                Bytecode::Star(Register(register)) => println!("{}: Star {}", btidx, register),
-                Bytecode::JumpIfFalse(label) => {
-                    println!("{}: JumpIfFalse {}", btidx, self.labels.get(label).unwrap())
-                }
-                Bytecode::Jump(label) => {
-                    println!("{}: Jump {}", btidx, self.labels.get(label).unwrap())
-                }
-                Bytecode::Mod(Register(register)) => println!("{}: Mod {}", btidx, register),
-                Bytecode::Mul(Register(register)) => println!("{}: Mul {}", btidx, register),
-                Bytecode::Neg => println!("{}: Neg", btidx),
-                Bytecode::ShiftLeft(Register(register)) => {
-                    println!("{}: ShiftLeft {}", btidx, register)
-                }
-                Bytecode::ShiftRight(Register(register)) => {
-                    println!("{}: ShiftRight {}", btidx, register)
-                }
-                Bytecode::Sub(Register(register)) => println!("{}: Sub {}", btidx, register),
-                Bytecode::Return => println!("{}: Return", btidx),
-                Bytecode::ReturnVoid => println!("{}: ReturnVoid", btidx),
-                Bytecode::TestEqual(Register(register)) => {
-                    println!("{}: TestEqual {}", btidx, register)
-                }
-                Bytecode::TestGreatherThan(Register(register)) => {
-                    println!("{}: TestGreaterThan {}", btidx, register)
-                }
-                Bytecode::TestGreatherThanOrEqual(Register(register)) => {
-                    println!("{}: TestGreatherThanOrEqual {}", btidx, register)
-                }
-                Bytecode::TestLessThan(Register(register)) => {
-                    println!("{}: TestLessThan {}", btidx, register)
-                }
-                Bytecode::TestLessThanOrEqual(Register(register)) => {
-                    println!("{}: TestLessThanOrEqual {}", btidx, register)
-                }
-                Bytecode::TestNotEqual(Register(register)) => {
-                    println!("{}: TestNotEqual {}", btidx, register)
-                }
+                Bytecode::AddI8(Register(register)) =>
+                    println!("{}: AddI8 {}", btidx, register),
+                Bytecode::AddI32(Register(register)) =>
+                    println!("{}: AddI32 {}", btidx, register),
+                Bytecode::AddI64(Register(register)) =>
+                    println!("{}: AddI64 {}", btidx, register),
+                Bytecode::AddF32(Register(register)) =>
+                    println!("{}: AddF32 {}", btidx, register),
+                Bytecode::AddF64(Register(register)) =>
+                    println!("{}: AddF64 {}", btidx, register),
+                Bytecode::BitwiseAnd(Register(register)) =>
+                    println!("{}: BitwiseAnd {}", btidx, register),
+                Bytecode::BitwiseOr(Register(register)) =>
+                    println!("{}: BitwiseOr {}", btidx, register),
+                Bytecode::BitwiseXor(Register(register)) =>
+                    println!("{}: BitwiseXor {}", btidx, register),
+                Bytecode::DivI32(Register(register)) =>
+                    println!("{}: DivI32 {}", btidx, register),
+                Bytecode::DivI64(Register(register)) =>
+                    println!("{}: DivI64 {}", btidx, register),
+                Bytecode::DivF32(Register(register)) =>
+                    println!("{}: DivF32 {}", btidx, register),
+                Bytecode::DivF64(Register(register)) =>
+                    println!("{}: DivF64 {}", btidx, register),
+                Bytecode::LdarI8(Register(register)) =>
+                    println!("{}: LdarI8 {}", btidx, register),
+                Bytecode::LdarI32(Register(register)) =>
+                    println!("{}: LdarI32 {}", btidx, register),
+                Bytecode::LdarI64(Register(register)) =>
+                    println!("{}: LdarI64 {}", btidx, register),
+                Bytecode::LdarF32(Register(register)) =>
+                    println!("{}: LdarF32 {}", btidx, register),
+                Bytecode::LdarF64(Register(register)) =>
+                    println!("{}: LdarF64 {}", btidx, register),
+                Bytecode::LdaI8(value) =>
+                    println!("{}: LdaI8 {}", btidx, value),
+                Bytecode::LdaI32(value) =>
+                    println!("{}: LdaI32 {}", btidx, value),
+                Bytecode::LdaI64(value) =>
+                    println!("{}: LdaI64 {}", btidx, value),
+                Bytecode::LdaF32(value) =>
+                    println!("{}: LdaF32 {}", btidx, value),
+                Bytecode::LdaF64(value) =>
+                    println!("{}: LdaF64 {}", btidx, value),
+                Bytecode::LdaZero =>
+                    println!("{}: LdaZero", btidx),
+                Bytecode::LogicalNot =>
+                    println!("{}: LogicalNot", btidx),
+                Bytecode::StarI8(Register(register)) =>
+                    println!("{}: StarI8 {}", btidx, register),
+                Bytecode::StarI32(Register(register)) =>
+                    println!("{}: StarI32 {}", btidx, register),
+                Bytecode::StarI64(Register(register)) =>
+                    println!("{}: StarI64 {}", btidx, register),
+                Bytecode::StarF32(Register(register)) =>
+                    println!("{}: StarF32 {}", btidx, register),
+                Bytecode::StarF64(Register(register)) =>
+                    println!("{}: StarF64 {}", btidx, register),
+                Bytecode::JumpIfFalse(label) =>
+                    println!("{}: JumpIfFalse {}", btidx, self.labels.get(label).unwrap()),
+                Bytecode::Jump(label) =>
+                    println!("{}: Jump {}", btidx, self.labels.get(label).unwrap()),
+                Bytecode::Mod(Register(register)) =>
+                    println!("{}: Mod {}", btidx, register),
+                Bytecode::MulI32(Register(register)) =>
+                    println!("{}: MulI32 {}", btidx, register),
+                Bytecode::MulI64(Register(register)) =>
+                    println!("{}: MulI64 {}", btidx, register),
+                Bytecode::MulF32(Register(register)) =>
+                    println!("{}: MulI32 {}", btidx, register),
+                Bytecode::MulF64(Register(register)) =>
+                    println!("{}: MulI64 {}", btidx, register),
+                Bytecode::Neg =>
+                    println!("{}: Neg", btidx),
+                Bytecode::ShiftLeft(Register(register)) =>
+                    println!("{}: ShiftLeft {}", btidx, register),
+                Bytecode::ShiftRight(Register(register)) =>
+                    println!("{}: ShiftRight {}", btidx, register),
+                Bytecode::SubI32(Register(register)) =>
+                    println!("{}: SubI32 {}", btidx, register),
+                Bytecode::SubI64(Register(register)) =>
+                    println!("{}: SubI64 {}", btidx, register),
+                Bytecode::SubF32(Register(register)) =>
+                    println!("{}: SubI32 {}", btidx, register),
+                Bytecode::SubF64(Register(register)) =>
+                    println!("{}: SubI64 {}", btidx, register),
+                Bytecode::Return =>
+                    println!("{}: Return", btidx),
+                Bytecode::ReturnVoid =>
+                    println!("{}: ReturnVoid", btidx),
+                Bytecode::TestEqual(Register(register)) =>
+                    println!("{}: TestEqual {}", btidx, register),
+                Bytecode::TestGreatherThan(Register(register)) =>
+                    println!("{}: TestGreaterThan {}", btidx, register),
+                Bytecode::TestGreatherThanOrEqual(Register(register)) =>
+                    println!("{}: TestGreatherThanOrEqual {}", btidx, register),
+                Bytecode::TestLessThan(Register(register)) =>
+                    println!("{}: TestLessThan {}", btidx, register),
+                Bytecode::TestLessThanOrEqual(Register(register)) =>
+                    println!("{}: TestLessThanOrEqual {}", btidx, register),
+                Bytecode::TestNotEqual(Register(register)) =>
+                    println!("{}: TestNotEqual {}", btidx, register),
             }
             btidx = btidx + 1;
         }
@@ -194,16 +269,16 @@ impl BytecodeGen {
     }
 
     // TODO - implement other statements
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+    fn visit_stmt(&mut self, src: &mut FctSrc, stmt: &Stmt) {
         match *stmt {
-            StmtBlock(ref block) => self.visit_block(block),
-            StmtReturn(ref ret) => self.visit_stmt_return(ret),
-            StmtBreak(ref stmt) => self.visit_stmt_break(stmt),
-            StmtContinue(ref stmt) => self.visit_stmt_continue(stmt),
-            StmtExpr(ref expr) => self.visit_stmt_expr(expr),
-            StmtIf(ref stmt) => self.visit_stmt_if(stmt),
-            StmtVar(ref stmt) => self.visit_stmt_var(stmt),
-            StmtWhile(ref stmt) => self.visit_stmt_while(stmt),
+            StmtBlock(ref block) => self.visit_block(src, block),
+            StmtReturn(ref ret) => self.visit_stmt_return(src, ret),
+            StmtBreak(ref stmt) => self.visit_stmt_break(src, stmt),
+            StmtContinue(ref stmt) => self.visit_stmt_continue(src, stmt),
+            StmtExpr(ref expr) => self.visit_stmt_expr(src, expr),
+            StmtIf(ref stmt) => self.visit_stmt_if(src, stmt),
+            StmtVar(ref stmt) => self.visit_stmt_var(src, stmt),
+            StmtWhile(ref stmt) => self.visit_stmt_while(src, stmt),
             // StmtLoop(ref stmt) => {},
             // StmtThrow(ref stmt) => {},
             // StmtDefer(ref stmt) => {},
@@ -214,7 +289,18 @@ impl BytecodeGen {
         }
     }
 
-    fn visit_stmt_var(&mut self, stmt: &StmtVarType) {
+    fn gen_star(&mut self, src: &mut FctSrc, nid: NodeId, reg: Register) {
+        let expr_ty = src.ty(nid);
+        match expr_ty {
+            BuiltinType::Int => { self.code.push(Bytecode::StarI32(reg)) },
+            BuiltinType::Long => { self.code.push(Bytecode::StarI64(reg)) },
+            BuiltinType::Float => { self.code.push(Bytecode::StarF32(reg)) },
+            BuiltinType::Double => { self.code.push(Bytecode::StarF64(reg)) },
+            _ => unimplemented!(),
+        }
+    }
+
+    fn visit_stmt_var(&mut self, src: &mut FctSrc, stmt: &StmtVarType) {
         let reg = self.regs;
         let varid = stmt.name;
         self.regs += 1;
@@ -224,14 +310,16 @@ impl BytecodeGen {
             .new_var(varid as Name, Register(reg));
 
         if let Some(ref expr) = stmt.expr {
-            self.visit_expr(expr);
+            self.visit_expr(src, expr);
+            self.gen_star(src, expr.id(), Register(reg));
         } else {
             self.code.push(Bytecode::LdaZero);
+            // TODO - check this, I dont know the type.
+            self.code.push(Bytecode::StarI32(Register(reg)));
         };
-        self.code.push(Bytecode::Star(Register(reg)));
     }
 
-    fn visit_stmt_while(&mut self, stmt: &StmtWhileType) {
+    fn visit_stmt_while(&mut self, src: &mut FctSrc, stmt: &StmtWhileType) {
         let cond_lbl = self.labels.len();
         let end_lbl = cond_lbl + 1;
         self.loops.push(LoopLabels {
@@ -242,81 +330,79 @@ impl BytecodeGen {
         self.labels.insert(Label(cond_lbl), self.code.len());
         self.labels.insert(Label(end_lbl), 0); // Just a place holder
 
-        self.visit_expr(&stmt.cond);
+        self.visit_expr(src, &stmt.cond);
         self.code.push(Bytecode::JumpIfFalse(Label(end_lbl)));
-        self.visit_stmt(&stmt.block);
+        self.visit_stmt(src, &stmt.block);
         self.code.push(Bytecode::Jump(Label(cond_lbl)));
         self.labels.insert(Label(end_lbl), self.code.len());
         self.loops.pop();
     }
 
-    fn visit_stmt_if(&mut self, stmt: &StmtIfType) {
+    fn visit_stmt_if(&mut self, src: &mut FctSrc, stmt: &StmtIfType) {
         let else_lbl = self.labels.len();
         let end_lbl = else_lbl + 1;
 
         self.labels.insert(Label(else_lbl), 0); // Just a place holder
         self.labels.insert(Label(end_lbl), 0); // Just a place holder
 
-        self.visit_expr(&stmt.cond);
+        self.visit_expr(src, &stmt.cond);
         self.code.push(Bytecode::JumpIfFalse(Label(else_lbl)));
-        self.visit_stmt(&stmt.then_block);
+        self.visit_stmt(src, &stmt.then_block);
         self.code.push(Bytecode::Jump(Label(end_lbl)));
         self.labels.insert(Label(else_lbl), self.code.len());
         match &stmt.else_block {
-            Some(else_block) => {
-                self.visit_stmt(&else_block);
-            }
-            _ => {}
+            Some(else_block) => { self.visit_stmt(src, &else_block); },
+            _ => {},
         }
         self.labels.insert(Label(end_lbl), self.code.len());
     }
 
-    fn visit_stmt_expr(&mut self, stmt: &StmtExprType) {
-        self.visit_expr(&stmt.expr);
+    fn visit_stmt_expr(&mut self, src: &mut FctSrc, stmt: &StmtExprType) {
+        self.visit_expr(src, &stmt.expr);
     }
 
-    fn visit_block(&mut self, block: &StmtBlockType) {
+    fn visit_block(&mut self, src: &mut FctSrc, block: &StmtBlockType) {
         let regs = self.regs;
         self.ctxs.push(Context::new());
         for stmt in &block.stmts {
-            self.visit_stmt(stmt);
+            self.visit_stmt(src, stmt);
         }
         self.ctxs.pop();
         self.regs = regs;
     }
 
-    fn visit_stmt_return(&mut self, ret: &StmtReturnType) {
+    fn visit_stmt_return(&mut self, src: &mut FctSrc, ret: &StmtReturnType) {
         if let Some(ref expr) = ret.expr {
-            self.visit_expr(expr);
+            self.visit_expr(src, expr);
         }
         self.code.push(Bytecode::Return);
     }
 
-    fn visit_stmt_break(&mut self, _stmt: &StmtBreakType) {
+    fn visit_stmt_break(&mut self, src: &mut FctSrc, stmt: &StmtBreakType) {
         let Label(end) = self.loops.pop().unwrap().end;
         self.code.push(Bytecode::Jump(Label(end)));
     }
 
-    fn visit_stmt_continue(&mut self, _stmt: &StmtContinueType) {
+    fn visit_stmt_continue(&mut self, src: &mut FctSrc, stmt: &StmtContinueType) {
         let Label(cond) = self.loops.last().unwrap().cond;
         self.code.push(Bytecode::Jump(Label(cond)));
     }
 
     // TODO - implement other expressions
-    fn visit_expr(&mut self, expr: &Expr) {
+    fn visit_expr(&mut self, src: &mut FctSrc, expr: &Expr) {
         match *expr {
-            ExprUn(ref un) => self.visit_expr_un(un),
-            ExprBin(ref bin) => self.visit_expr_bin(bin),
+            ExprUn(ref un) => self.visit_expr_un(src, un),
+            ExprBin(ref bin) => self.visit_expr_bin(src, bin),
             // ExprField(ref field) => {},
             // ExprArray(ref array) => {},
-            // ExprLitChar(ref lit) => {},
-            ExprLitInt(ref lit) => self.visit_expr_lit_int(lit),
-            // ExprLitFloat(ref lit) => {},
+            ExprLitChar(ref lit) => self.visit_expr_lit_char(src, lit),
+            ExprLitInt(ref lit) => self.visit_expr_lit_int(src, lit),
+            ExprLitFloat(ref lit) => self.visit_expr_lit_float(src, lit),
             // ExprLitStr(ref lit) => {},
             // ExprLitStruct(ref lit) => {},
             // ExprLitBool(ref lit) => {},
-            ExprIdent(ref ident) => self.visit_expr_ident(ident),
-            ExprAssign(ref assign) => self.visit_expr_assign(assign),
+            ExprIdent(ref ident) => self.visit_expr_ident(src, ident),
+            ExprAssign(ref assign) => self.visit_expr_assign(src, assign),
             // ExprCall(ref call) => {},
             // ExprDelegation(ref call) => {},
             // ExprSelf(ref selfie) => {},
@@ -329,16 +415,33 @@ impl BytecodeGen {
         }
     }
 
-    fn visit_expr_lit_int(&mut self, lit: &ExprLitIntType) {
+    fn visit_expr_lit_char(&mut self, src: &mut FctSrc, lit: &ExprLitCharType) {
+        self.code.push(Bytecode::LdaI8(lit.value as u8));
+    }
+
+    fn visit_expr_lit_int(&mut self, src: &mut FctSrc, lit: &ExprLitIntType) {
         if lit.value == 0 {
             self.code.push(Bytecode::LdaZero);
         } else {
-            self.code.push(Bytecode::LdaInt(lit.value));
+            let bytecode = match lit.suffix {
+                IntSuffix::Byte => Bytecode::LdaI8(lit.value as u8),
+                IntSuffix::Int => Bytecode::LdaI32(lit.value as u32),
+                IntSuffix::Long => Bytecode::LdaI64(lit.value as u64),
+            };
+            self.code.push(bytecode);
         }
     }
 
-    fn visit_expr_un(&mut self, expr: &ExprUnType) {
-        self.visit_expr(&expr.opnd);
+    fn visit_expr_lit_float(&mut self, src: &mut FctSrc, lit: &ExprLitFloatType) {
+        let bytecode = match lit.suffix {
+            FloatSuffix::Float => Bytecode::LdaF32(lit.value as f32),
+            FloatSuffix::Double => Bytecode::LdaF64(lit.value as f64),
+        };
+        self.code.push(bytecode);
+    }
+
+    fn visit_expr_un(&mut self, src: &mut FctSrc, expr: &ExprUnType) {
+        self.visit_expr(src, &expr.opnd);
         match expr.op {
             UnOp::Plus => {}
             UnOp::Neg => self.code.push(Bytecode::Neg),
@@ -346,23 +449,67 @@ impl BytecodeGen {
         }
     }
 
-    fn visit_expr_bin(&mut self, expr: &ExprBinType) {
-        self.visit_expr(&expr.rhs);
+    fn gen_add(&mut self, src: &mut FctSrc, expr: &ExprBinType, reg: Register) {
+        let expr_ty = src.ty(expr.id);
+        match expr_ty {
+            BuiltinType::Int => { self.code.push(Bytecode::AddI32(reg)) },
+            BuiltinType::Long => { self.code.push(Bytecode::AddI64(reg)) },
+            BuiltinType::Float => { self.code.push(Bytecode::AddF32(reg)) },
+            BuiltinType::Double => { self.code.push(Bytecode::AddF64(reg)) },
+            _ => unimplemented!(),
+        }
+    }
+
+    fn gen_sub(&mut self, src: &mut FctSrc, expr: &ExprBinType, reg: Register) {
+        let expr_ty = src.ty(expr.id);
+        match expr_ty {
+            BuiltinType::Int => { self.code.push(Bytecode::SubI32(reg)) },
+            BuiltinType::Long => { self.code.push(Bytecode::SubI64(reg)) },
+            BuiltinType::Float => { self.code.push(Bytecode::SubF32(reg)) },
+            BuiltinType::Double => { self.code.push(Bytecode::SubF64(reg)) },
+            _ => unimplemented!(),
+        }
+    }
+
+    fn gen_mul(&mut self, src: &mut FctSrc, expr: &ExprBinType, reg: Register) {
+        let expr_ty = src.ty(expr.id);
+        match expr_ty {
+            BuiltinType::Int => { self.code.push(Bytecode::MulI32(reg)) },
+            BuiltinType::Long => { self.code.push(Bytecode::MulI64(reg)) },
+            BuiltinType::Float => { self.code.push(Bytecode::MulF32(reg)) },
+            BuiltinType::Double => { self.code.push(Bytecode::MulF64(reg)) },
+            _ => unimplemented!(),
+        }
+    }
+
+    fn gen_div(&mut self, src: &mut FctSrc, expr: &ExprBinType, reg: Register) {
+        let expr_ty = src.ty(expr.id);
+        match expr_ty {
+            BuiltinType::Int => { self.code.push(Bytecode::DivI32(reg)) },
+            BuiltinType::Long => { self.code.push(Bytecode::DivI64(reg)) },
+            BuiltinType::Float => { self.code.push(Bytecode::DivF32(reg)) },
+            BuiltinType::Double => { self.code.push(Bytecode::DivF64(reg)) },
+            _ => unimplemented!(),
+        }
+    }
+
+    fn visit_expr_bin(&mut self, src: &mut FctSrc, expr: &ExprBinType) {
+        self.visit_expr(src, &expr.rhs);
         let rhs_reg = self.regs;
         self.regs += 1;
-        self.code.push(Bytecode::Star(Register(rhs_reg)));
-        self.visit_expr(&expr.lhs);
+        self.gen_star(src, expr.rhs.id(), Register(rhs_reg));
+        self.visit_expr(src, &expr.lhs);
         match expr.op {
-            BinOp::Add => self.code.push(Bytecode::Add(Register(rhs_reg))),
-            BinOp::Sub => self.code.push(Bytecode::Sub(Register(rhs_reg))),
-            BinOp::Mul => self.code.push(Bytecode::Mul(Register(rhs_reg))),
-            BinOp::Div => self.code.push(Bytecode::Div(Register(rhs_reg))),
-            BinOp::Mod => self.code.push(Bytecode::Mod(Register(rhs_reg))),
-            BinOp::BitOr => self.code.push(Bytecode::BitwiseOr(Register(rhs_reg))),
-            BinOp::BitAnd => self.code.push(Bytecode::BitwiseAnd(Register(rhs_reg))),
-            BinOp::BitXor => self.code.push(Bytecode::BitwiseXor(Register(rhs_reg))),
-            BinOp::ShiftL => self.code.push(Bytecode::ShiftLeft(Register(rhs_reg))),
-            BinOp::ShiftR => self.code.push(Bytecode::ShiftRight(Register(rhs_reg))),
+            BinOp::Add => { self.gen_add(src, expr, Register(rhs_reg)) },
+            BinOp::Sub => { self.gen_sub(src, expr, Register(rhs_reg)) },
+            BinOp::Mul => { self.gen_mul(src, expr, Register(rhs_reg)) },
+            BinOp::Div => { self.gen_div(src, expr, Register(rhs_reg)) },
+            BinOp::Mod => { self.code.push(Bytecode::Mod(Register(rhs_reg))) },
+            BinOp::BitOr => { self.code.push(Bytecode::BitwiseOr(Register(rhs_reg))) },
+            BinOp::BitAnd => { self.code.push(Bytecode::BitwiseAnd(Register(rhs_reg))) },
+            BinOp::BitXor => { self.code.push(Bytecode::BitwiseXor(Register(rhs_reg))) },
+            BinOp::ShiftL => { self.code.push(Bytecode::ShiftLeft(Register(rhs_reg))) },
+            BinOp::ShiftR => { self.code.push(Bytecode::ShiftRight(Register(rhs_reg))) },
             // BinOp::Or => { },
             // BinOp::And => { },
             // BinOp::UnShiftR => { },
@@ -390,30 +537,41 @@ impl BytecodeGen {
         self.regs -= 1;
     }
 
-    fn visit_expr_assign(&mut self, expr: &ExprAssignType) {
-        self.visit_expr(&expr.rhs);
+    fn visit_expr_assign(&mut self, src: &mut FctSrc, expr: &ExprAssignType) {
+        self.visit_expr(src, &expr.rhs);
         match *expr.lhs {
             ExprIdent(ref assign) => {
                 let Register(reg) = *self.get_reg(assign.name).unwrap();
-                self.code.push(Bytecode::Star(Register(reg)));
-            }
+                self.gen_star(src, expr.rhs.id(), Register(reg));
+            },
             _ => unimplemented!(),
         }
     }
 
-    fn visit_expr_ident(&mut self, ident: &ExprIdentType) {
+    fn visit_expr_ident(&mut self, src: &mut FctSrc, ident: &ExprIdentType) {
         let Register(reg) = *self.get_reg(ident.name).unwrap();
-        self.code.push(Bytecode::Ldar(Register(reg)));
+        let expr_ty = src.ty(ident.id);
+        match expr_ty {
+            BuiltinType::Int => { self.code.push(Bytecode::LdarI32(Register(reg))) },
+            BuiltinType::Long => { self.code.push(Bytecode::LdarI64(Register(reg))) },
+            BuiltinType::Float => { self.code.push(Bytecode::LdarF32(Register(reg))) },
+            BuiltinType::Double => { self.code.push(Bytecode::LdarF64(Register(reg))) },
+            _ => unimplemented!(),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use driver::cmd::Args;
+    use boots::bytecodegen::*;
     use boots::bytecodegen::Bytecode::*;
     use boots::bytecodegen::*;
     use dora_parser::interner::Interner;
     use dora_parser::lexer::reader::Reader;
-    use dora_parser::parser::{NodeIdGenerator, Parser};
+    use os::mem;
+    use semck;
+    use driver::start;
 
     fn parse(code: &'static str) -> (Ast, Interner) {
         let id_generator = NodeIdGenerator::new();
@@ -428,541 +586,421 @@ mod tests {
         (ast, interner)
     }
 
+    fn run_test(tname: &'static str, code: &'static str, expected: Vec<Bytecode>)  {
+        mem::init_page_size();
+        let mut interner = Interner::new();
+        let id_generator = NodeIdGenerator::new();
+        let mut ast = Ast::new();
+
+        if let Err(code) = start::parse_dir("stdlib", &id_generator, &mut ast, &mut interner) {
+            println!("failed to load stdlib ({})", code);
+        }
+
+        if let Err(code) = Parser::new(
+                Reader::from_string(code),
+                &id_generator,
+                &mut ast,
+                &mut interner).parse() {
+            println!("failed to load code from string ({})", code);
+        }
+
+        let mut vm = VM::new(Args::default(), &ast, interner);
+        semck::check(&mut vm);
+
+        let name = vm.interner.intern(tname);
+        let fctid = vm.sym.borrow().get_fct(name).unwrap();
+        let bytecodegen = BytecodeGen::generate(&vm, fctid);
+        assert_eq!(expected, bytecodegen.code);
+    }
+
     #[test]
     fn gen_nooptimize() {
-        let (ast, _) = parse("fun f() {1 + 2;}");
-        let mut bytecodegen = BytecodeGen::new();
-        bytecodegen.gen(&ast);
-        assert!(bytecodegen.code.is_empty());
+        run_test("f", "fun f() {1 + 2;}", vec![]);
     }
 
     #[test]
     fn gen_add() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() {1 + 2;}",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            Add(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() {1 + 2;}",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                AddI32(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_sub() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() {1 - 2;}",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            Sub(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() {1 - 2;}",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                SubI32(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_div() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() {1 / 2;}",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            Div(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() {1 / 2;}",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                DivI32(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_mul() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() {1 * 2;}",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            Mul(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() {1 * 2;}",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                MulI32(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_stmt_var_noinit() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { let x; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let mut expected = Vec::new();
-        expected.push(Bytecode::LdaZero);
-        expected.push(Bytecode::Star(Register(0)));
-        expected.push(Bytecode::ReturnVoid);
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { let x; }",
+            vec![LdaZero, StarI32(Register(0)), ReturnVoid]);
     }
 
     #[test]
     fn gen_stmt_var_init() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { let x = 1; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![LdaInt(1), Star(Register(0)), ReturnVoid];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { let x = 1; }",
+            vec![LdaI32(1), StarI32(Register(0)), ReturnVoid]);
     }
 
     #[test]
     fn gen_stmt_while() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { while 1 { 0; } }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let code = vec![
-            LdaInt(1),
-            JumpIfFalse(Label(1)),
-            LdaZero,
-            Jump(Label(0)),
-            ReturnVoid,
-        ];
-        let labels = hashmap![Label(0) => 0, Label(1) => 4];
-        bytecodegen.gen(&ast);
-        assert_eq!(code, bytecodegen.code);
-        assert_eq!(labels, bytecodegen.labels);
+        run_test(
+            "f",
+            "optimize fun f() { while 1 { 0; } }",
+            vec![
+                LdaI32(1),
+                JumpIfFalse(Label(1)),
+                LdaZero,
+                Jump(Label(0)),
+                ReturnVoid]);
+        // TODO - test labels!
+        // let labels = hashmap![Label(0) => 0, Label(1) => 4];
+        //assert_eq!(labels, bytecodegen.labels);
     }
 
     #[test]
     fn gen_stmt_if() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { if 0 { 1; } }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaZero,
-            JumpIfFalse(Label(0)),
-            LdaInt(1),
-            Jump(Label(1)),
-            ReturnVoid,
-        ];
-        let labels = hashmap![Label(0) => 4, Label(1) => 4];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
-        assert_eq!(labels, bytecodegen.labels);
+        run_test(
+            "f",
+            "optimize fun f() { if 0 { 1; } }",
+            vec![
+                LdaZero,
+                JumpIfFalse(Label(0)),
+                LdaI32(1),
+                Jump(Label(1)),
+                ReturnVoid]);
+        // TODO - need to assert labels
+        //let labels = hashmap![Label(0) => 4, Label(1) => 4];
+        //assert_eq!(labels, bytecodegen.labels);
     }
 
     #[test]
     fn gen_stmt_if_else() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { if 0 { 1; } else { 2; } }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaZero,
-            JumpIfFalse(Label(0)),
-            LdaInt(1),
-            Jump(Label(1)),
-            LdaInt(2),
-            ReturnVoid,
-        ];
-        let labels = hashmap![Label(0) => 4, Label(1) => 5];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
-        assert_eq!(labels, bytecodegen.labels);
+        run_test(
+            "f",
+            "optimize fun f() { if 0 { 1; } else { 2; } }",
+            vec![
+                LdaZero,
+                JumpIfFalse(Label(0)),
+                LdaI32(1),
+                Jump(Label(1)),
+                LdaI32(2),
+                ReturnVoid]);
+        // TODO - need to assert labels
+//        let labels = hashmap![Label(0) => 4, Label(1) => 5];
+//        assert_eq!(labels, bytecodegen.labels);
     }
 
     #[test]
     fn gen_stmt_break() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { while 1 { break; } }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(1),
-            JumpIfFalse(Label(1)),
-            Jump(Label(1)),
-            Jump(Label(0)),
-            ReturnVoid,
-        ];
-        let labels = hashmap![Label(0) => 0, Label(1) => 4];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
-        assert_eq!(labels, bytecodegen.labels);
+        run_test(
+            "f",
+            "optimize fun f() { while 1 { break; } }",
+            vec![
+                LdaI32(1),
+                JumpIfFalse(Label(1)),
+                Jump(Label(1)),
+                Jump(Label(0)),
+                ReturnVoid]);
+        // TODO - need to assert labels
+        //let labels = hashmap![Label(0) => 0, Label(1) => 4];
+        //assert_eq!(labels, bytecodegen.labels);
     }
 
     #[test]
     fn gen_stmt_continue() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { while 1 { continue; } }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(1),
-            JumpIfFalse(Label(1)),
-            Jump(Label(0)),
-            Jump(Label(0)),
-            ReturnVoid,
-        ];
-        let labels = hashmap![Label(0) => 0, Label(1) => 4];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
-        assert_eq!(labels, bytecodegen.labels);
+        run_test(
+            "f",
+            "optimize fun f() { while 1 { continue; } }",
+            vec![
+                LdaI32(1),
+                JumpIfFalse(Label(1)),
+                Jump(Label(0)),
+                Jump(Label(0)),
+                ReturnVoid]);
+        // TODO - need to assert labels
+        //let labels = hashmap![Label(0) => 0, Label(1) => 4];
+        //assert_eq!(labels, bytecodegen.labels);
     }
 
     #[test]
     fn gen_expr_lit_int() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![LdaInt(1), ReturnVoid];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1; }",
+            vec![LdaI32(1), ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_lit_zero() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 0; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![LdaZero, ReturnVoid];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 0; }",
+            vec![LdaZero, ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_puls() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { +1; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![LdaInt(1), ReturnVoid];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { +1; }",
+            vec![ LdaI32(1), ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_neg() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { -1; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![LdaInt(1), Neg, ReturnVoid];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { -1; }",
+            vec![ LdaI32(1), Neg, ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_not() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { !1; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![LdaInt(1), LogicalNot, ReturnVoid];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { !1; }",
+            vec![ LdaI32(1), LogicalNot, ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_mod() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1 % 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            Mod(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1 % 2; }",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                Mod(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_bit_or() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1 | 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            BitwiseOr(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1 | 2; }",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                BitwiseOr(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_bit_and() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1 & 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            BitwiseAnd(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1 & 2; }",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                BitwiseAnd(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_bit_xor() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1 ^ 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            BitwiseXor(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1 ^ 2; }",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                BitwiseXor(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_bit_shiftl() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1 << 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            ShiftLeft(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1 << 2; }",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                ShiftLeft(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_bit_shiftr() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1 >> 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            ShiftRight(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1 >> 2; }",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                ShiftRight(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_test_equal() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1 == 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            TestEqual(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1 == 2; }",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                TestEqual(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_test_notequal() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1 != 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            TestNotEqual(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1 != 2; }",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                TestNotEqual(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_test_lessthan() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1 < 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            TestLessThan(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1 < 2; }",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                TestLessThan(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_test_lessthanequal() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1 <= 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            TestLessThanOrEqual(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1 <= 2; }",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                TestLessThanOrEqual(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_test_greaterthan() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1 > 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            TestGreatherThan(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1 > 2; }",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                TestGreatherThan(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_test_greaterthanequall() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { 1 >= 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(2),
-            Star(Register(0)),
-            LdaInt(1),
-            TestGreatherThanOrEqual(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { 1 >= 2; }",
+            vec![
+                LdaI32(2),
+                StarI32(Register(0)),
+                LdaI32(1),
+                TestGreatherThanOrEqual(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_ident() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { let x = 1; x; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![LdaInt(1), Star(Register(0)), Ldar(Register(0)), ReturnVoid];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { let x = 1; x; }",
+            vec![
+                LdaI32(1),
+                StarI32(Register(0)),
+                LdarI32(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_assign() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { var x = 1; x = 2; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![
-            LdaInt(1),
-            Star(Register(0)),
-            LdaInt(2),
-            Star(Register(0)),
-            ReturnVoid,
-        ];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { var x = 1; x = 2; }",
+            vec![
+                LdaI32(1),
+                StarI32(Register(0)),
+                LdaI32(2),
+                StarI32(Register(0)),
+                ReturnVoid]);
     }
 
     #[test]
     fn gen_expr_return() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { return 1; }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![LdaInt(1), Return];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { return 1; }",
+            vec![ LdaI32(1), Return ]);
     }
 
     #[test]
     fn gen_expr_returnvoid() {
-        let (ast, _) = parse(
-            "
-            optimize fun f() { }",
-        );
-        let mut bytecodegen = BytecodeGen::new();
-        let expected = vec![ReturnVoid];
-        bytecodegen.gen(&ast);
-        assert_eq!(expected, bytecodegen.code);
+        run_test(
+            "f",
+            "optimize fun f() { }",
+            vec![ ReturnVoid ]);
     }
 }
