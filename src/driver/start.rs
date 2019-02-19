@@ -10,7 +10,6 @@ use dora_parser::interner::Interner;
 use dora_parser::lexer::position::Position;
 use dora_parser::lexer::reader::Reader;
 use driver::cmd;
-use boots::bytecodegen::BytecodeGen;
 use object;
 use os;
 use timer::Timer;
@@ -49,11 +48,6 @@ pub fn start() -> i32 {
 
     if args.flag_emit_ast {
         ast::dump::dump(&ast, &interner);
-    }
-
-    {
-        let mut bytecodegen = BytecodeGen::new();
-        bytecodegen.gen(&ast);
     }
 
     let mut vm = VM::new(args, &ast, interner);
@@ -183,7 +177,7 @@ fn run_main<'ast>(vm: &VM<'ast>, main: FctId) -> i32 {
     }
 }
 
-fn parse_dir(
+pub fn parse_dir(
     dirname: &str,
     id_generator: &NodeIdGenerator,
     ast: &mut Ast,
@@ -208,7 +202,7 @@ fn parse_dir(
     }
 }
 
-fn parse_file(
+pub fn parse_file(
     filename: &str,
     id_generator: &NodeIdGenerator,
     ast: &mut Ast,
