@@ -9,6 +9,7 @@ use dora_parser::ast::Stmt::*;
 use dora_parser::interner::Name;
 use dora_parser::lexer::token::{FloatSuffix, IntSuffix};
 
+// TODO - have types for registers
 #[derive(PartialEq,Debug)]
 pub struct Register(usize);
 #[derive(PartialEq,Debug,Eq,Hash)]
@@ -585,7 +586,11 @@ mod tests {
         (ast, interner)
     }
 
-    fn run_test(tname: &'static str, code: &'static str, expected: Vec<Bytecode>)  {
+    fn run_test(
+            tname: &'static str,
+            code: &'static str,
+            exp_code: Vec<Bytecode>,
+            exp_labels: HashMap<Label, usize>)  {
         mem::init_page_size();
         let mut interner = Interner::new();
         let id_generator = NodeIdGenerator::new();
@@ -609,12 +614,13 @@ mod tests {
         let name = vm.interner.intern(tname);
         let fctid = vm.sym.borrow().get_fct(name).unwrap();
         let bytecodegen = BytecodeGen::generate(&vm, fctid);
-        assert_eq!(expected, bytecodegen.code);
+        assert_eq!(exp_code, bytecodegen.code);
+        assert_eq!(exp_labels, bytecodegen.labels);
     }
 
     #[test]
     fn gen_nooptimize() {
-        run_test("f", "fun f() {1 + 2;}", vec![]);
+        run_test("f", "fun f() {1 + 2;}", vec![], hashmap![]);
     }
 
     #[test]
@@ -627,7 +633,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 AddInt(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -640,7 +647,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 SubInt(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -653,7 +661,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 DivInt(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -666,7 +675,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 MulInt(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -674,7 +684,8 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { let x; }",
-            vec![LdaZero, StarInt(Register(0)), ReturnVoid]);
+            vec![LdaZero, StarInt(Register(0)), ReturnVoid],
+            hashmap![]);
     }
 
      #[test]
@@ -682,7 +693,8 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { let x = 1; }",
-            vec![LdaInt(1), StarInt(Register(0)), ReturnVoid]);
+            vec![LdaInt(1), StarInt(Register(0)), ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -695,10 +707,8 @@ mod tests {
                 JumpIfFalse(Label(1)),
                 LdaZero,
                 Jump(Label(0)),
-                ReturnVoid]);
-        // TODO - test labels!
-        // let labels = hashmap![Label(0) => 0, Label(1) => 4];
-        //assert_eq!(labels, bytecodegen.labels);
+                ReturnVoid],
+            hashmap![Label(0) => 0, Label(1) => 4]);
     }
 
     #[test]
@@ -711,10 +721,8 @@ mod tests {
                 JumpIfFalse(Label(0)),
                 LdaInt(1),
                 Jump(Label(1)),
-                ReturnVoid]);
-        // TODO - need to assert labels
-        //let labels = hashmap![Label(0) => 4, Label(1) => 4];
-        //assert_eq!(labels, bytecodegen.labels);
+                ReturnVoid],
+            hashmap![Label(0) => 4, Label(1) => 4]);
     }
 
     #[test]
@@ -728,10 +736,8 @@ mod tests {
                 LdaInt(1),
                 Jump(Label(1)),
                 LdaInt(2),
-                ReturnVoid]);
-        // TODO - need to assert labels
-//        let labels = hashmap![Label(0) => 4, Label(1) => 5];
-//        assert_eq!(labels, bytecodegen.labels);
+                ReturnVoid],
+            hashmap![Label(0) => 4, Label(1) => 5]);
     }
 
     #[test]
@@ -744,10 +750,8 @@ mod tests {
                 JumpIfFalse(Label(1)),
                 Jump(Label(1)),
                 Jump(Label(0)),
-                ReturnVoid]);
-        // TODO - need to assert labels
-        //let labels = hashmap![Label(0) => 0, Label(1) => 4];
-        //assert_eq!(labels, bytecodegen.labels);
+                ReturnVoid],
+            hashmap![Label(0) => 0, Label(1) => 4]);
     }
 
     #[test]
@@ -760,10 +764,8 @@ mod tests {
                 JumpIfFalse(Label(1)),
                 Jump(Label(0)),
                 Jump(Label(0)),
-                ReturnVoid]);
-        // TODO - need to assert labels
-        //let labels = hashmap![Label(0) => 0, Label(1) => 4];
-        //assert_eq!(labels, bytecodegen.labels);
+                ReturnVoid],
+            hashmap![Label(0) => 0, Label(1) => 4]);
     }
 
     #[test]
@@ -771,7 +773,8 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { 1; }",
-            vec![LdaInt(1), ReturnVoid]);
+            vec![LdaInt(1), ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -779,7 +782,8 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { 0; }",
-            vec![LdaZero, ReturnVoid]);
+            vec![LdaZero, ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -787,7 +791,8 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { +1; }",
-            vec![ LdaInt(1), ReturnVoid]);
+            vec![ LdaInt(1), ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -795,7 +800,8 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { -1; }",
-            vec![ LdaInt(1), Neg, ReturnVoid]);
+            vec![ LdaInt(1), Neg, ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -803,7 +809,8 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { !1; }",
-            vec![ LdaInt(1), LogicalNot, ReturnVoid]);
+            vec![ LdaInt(1), LogicalNot, ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -816,7 +823,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 Mod(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -829,7 +837,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 BitwiseOr(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -842,7 +851,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 BitwiseAnd(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -855,7 +865,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 BitwiseXor(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -868,7 +879,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 ShiftLeft(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -881,7 +893,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 ShiftRight(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -894,7 +907,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 TestEqual(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -907,7 +921,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 TestNotEqual(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -920,7 +935,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 TestLessThan(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -933,7 +949,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 TestLessThanOrEqual(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -946,7 +963,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 TestGreatherThan(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -959,7 +977,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(1),
                 TestGreatherThanOrEqual(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -971,7 +990,8 @@ mod tests {
                 LdaInt(1),
                 StarInt(Register(0)),
                 LdarInt(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -984,7 +1004,8 @@ mod tests {
                 StarInt(Register(0)),
                 LdaInt(2),
                 StarInt(Register(0)),
-                ReturnVoid]);
+                ReturnVoid],
+            hashmap![]);
     }
 
     #[test]
@@ -992,7 +1013,8 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { return 1; }",
-            vec![ LdaInt(1), Return ]);
+            vec![ LdaInt(1), Return ],
+            hashmap![]);
     }
 
     #[test]
@@ -1000,6 +1022,7 @@ mod tests {
         run_test(
             "f",
             "optimize fun f() { }",
-            vec![ ReturnVoid ]);
+            vec![ ReturnVoid ],
+            hashmap![]);
     }
 }
