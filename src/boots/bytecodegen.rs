@@ -779,6 +779,33 @@ mod tests {
     }
 
     #[test]
+    fn gen_expr_lit_long() {
+        run_test(
+            "f",
+            "optimize fun f() { 1L; }",
+            vec![LdaLong(1), ReturnVoid],
+            hashmap![]);
+    }
+
+    #[test]
+    fn gen_expr_lit_float() {
+        run_test(
+            "f",
+            "optimize fun f() { 1.0F; }",
+            vec![LdaFloat(1.0), ReturnVoid],
+            hashmap![]);
+    }
+
+    #[test]
+    fn gen_expr_lit_double() {
+        run_test(
+            "f",
+            "optimize fun f() { 1.0D; }",
+            vec![LdaDouble(1.0), ReturnVoid],
+            hashmap![]);
+    }
+
+    #[test]
     fn gen_expr_lit_zero() {
         run_test(
             "f",
